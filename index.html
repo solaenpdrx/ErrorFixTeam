@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>เมนูสั่งอาหาร</title>
+  <!-- LINE LIFF SDK -->
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f7f9fa; margin: 0; padding: 16px; }
+    .header { text-align: center; margin-bottom: 20px; }
+    .menu-card { background: #fff; border-radius: 12px; padding: 12px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .menu-info { flex: 1; }
+    .menu-name { font-weight: bold; font-size: 16px; color: #333; }
+    .menu-price { color: #e53e3e; font-size: 14px; margin-top: 4px; }
+    .qty-control { display: flex; align-items: center; gap: 8px; }
+    .btn-qty { background: #edf2f7; border: none; width: 32px; height: 32px; border-radius: 50%; font-size: 18px; font-weight: bold; cursor: pointer; }
+    .qty-num { font-weight: bold; min-width: 20px; text-align: center; }
+    .footer { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 16px; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
+    .total-price { font-size: 18px; font-weight: bold; color: #2d3748; }
+    .btn-submit { background: #06C755; color: white; border: none; padding: 12px 24px; border-radius: 24px; font-size: 16px; font-weight: bold; cursor: pointer; }
+    .btn-submit:disabled { background: #ccc; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h2>🍽️ เลือกรายการอาหาร</h2>
+  </div>
+
+  <div id="menu-container">
+    <!-- รายการอาหารจะถูกโหลดมาแสดงตรงนี้ -->
+  </div>
+
+  <div style="height: 80px;"></div> <!-- เว้นพื้นที่ส่วนท้าย -->
+
+  <div class="footer">
+    <div class="total-price">ราคารวม: <span id="total-amount">0</span> บาท</div>
+    <button class="btn-submit" id="btn-order" onclick="submitOrder()" disabled>สั่งซื้อเลย</button>
+  </div>
+
+  <script>
+    const LIFF_ID = "YOUR_LIFF_ID_HERE"; // วาง LIFF ID ของคุณ
+    let cart = {};
+    const menuData = [
+      { id: "M01", name: "ข้าวผัดกุ้ง", price: 80 },
+      { id: "M02", name: "กะเพราหมูสับไข่ดาว", price: 70 },
+      { id: "M03", name: "สลัดอกไก่คลีน", price: 129 },
+      { id: "M04", name: "ชามะนาวเย็น", price: 35 }
+    ];
+
+    async function main() {
+      await liff.init({ liffId: LIFF_ID });
+      if (!liff.isLoggedIn()) {
+        liff.login();
+      } else {
+        renderMenu();
+      }
+    }
+
+    function renderMenu() {
+      const container = document.getElementById("menu-container");
+      container.innerHTML = "";
+      menuData.forEach(item => {
+        cart[item.id] = 0;
+        container.innerHTML += `
+          <div class="menu-card">
+            <div class="menu-info">
+              <div class="menu-name">${item.name}</div>
+              <div class="menu-price">${item.price} บาท</div>
+            </div>
+            <div class="qty-control">
+              <button class="btn-qty" onclick="changeQty('${item.id}', -1)">-</button>
+              <span class="qty-num" id="qty-${item.id}">0</span>
+              <button class="btn-qty" onclick="changeQty('${item.id}', 1)">+</button>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    function changeQty(itemId, delta) {
+      if (cart[itemId] + delta >= 0) {
+        cart[itemId] += delta;
+        document.getElementById(`qty-${itemId}`).innerText = cart[itemId];
+        calculateTotal();
+      }
+    }
+
+    function calculateTotal() {
+      let total = 0;
+      let count = 0;
+      menuData.forEach(item => {
+        total += cart[item.id] * item.price;
+        count += cart[item.id];
+      });
+      document.getElementById("total-amount").innerText = total;
+      document.getElementById("btn-order").disabled = count === 0;
+    }
+
+    async function submitOrder() {
+      let orderItems = [];
+      let total = 0;
+
+      menuData.forEach(item => {
+        const qty = cart[item.id];
+        if (qty > 0) {
+          orderItems.push(`${item.name} x${qty}`);
+          total += item.price * qty;
+        }
+      });
+
+      const orderSummaryText = `🛒 **ยืนยันการสั่งซื้อผ่าน LIFF**\n` +
+        `------------------\n` +
+        orderItems.map(i => `• ${i}`).join("\n") +
+        `\n------------------\n` +
+        `💰 ราคารวมทั้งสิ้น: ${total} บาท`;
+
+      try {
+        // ส่งข้อความกลับเข้าไปในห้องแชท LINE ของลูกค้า
+        await liff.sendMessages([
+          { type: 'text', text: orderSummaryText }
+        ]);
+        liff.closeWindow(); // ปิดหน้า LIFF
+      } catch (err) {
+        alert("เกิดข้อผิดพลาดในการส่งข้อมูล: " + err.message);
+      }
+    }
+
+    main();
+  </script>
+</body>
+</html>
